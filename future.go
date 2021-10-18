@@ -9,7 +9,7 @@ import (
 
 var ErrPromiseTimeout = errors.New("promise timeout")
 
-// Future returns result (interface{} and error if any) sometime in the future.
+// Future returns result sometime in the future.
 type Future struct {
 	ctx     context.Context
 	promise func(ctx context.Context) (interface{}, error)
@@ -26,8 +26,8 @@ type Future struct {
 
 // New creates new Future.
 //
-// 'promise' will be called exactly once to produce the Future's result.
-// 'ctx' is passed to 'promise', if 'timeout' is not provided.
+// 'promise' produces the Future's result. 'promise' will be called exactly once.
+// 'ctx' - initial context (is passed to 'promise', if 'timeout' is not provided).
 // 'timeout' - timeout for 'promise' (pass zero if timeout is not needed).
 // If 'timeout' is provided, new context (that is canceled when 'timeout' elapses)
 // is derived from 'ctx' and passed to 'promise'.
@@ -78,9 +78,9 @@ func (f *Future) getResult() {
 	}
 }
 
-// Result returns the Future's result (interface{} and error if any).
+// Result returns the Future's result.
 //
-// If the result (possibly containing only error) is not ready,
+// If the result (possibly containing only error) is not ready yet,
 // Result blocks until the result is ready. Result is threadsafe.
 func (f *Future) Result() (interface{}, error) {
 	if f.lazy {
