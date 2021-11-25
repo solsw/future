@@ -9,11 +9,9 @@ import (
 )
 
 func TestFuture_Result(t *testing.T) {
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel1()
-	prom := func(ctx context.Context) (interface{}, error) {
+	promise := func(ctx context.Context) (interface{}, error) {
 		select {
-		case <-time.After(200 * time.Millisecond):
+		case <-time.After(500 * time.Millisecond):
 			return 1, nil
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -21,28 +19,47 @@ func TestFuture_Result(t *testing.T) {
 	}
 	tests := []struct {
 		name        string
+		ctxTimeout  time.Duration
 		f           *Future
 		want        interface{}
 		wantErr     bool
 		expectedErr error
 	}{
-		{name: "1 - initial context with timeout, no future's timeout",
-			f:           New(prom, ctx1, 0, true),
+		{name: "1 - initial context with timeout, future without timeout",
+			ctxTimeout:  100 * time.Millisecond,
+			f:           New(promise, context.Background(), 0, true),
 			wantErr:     true,
 			expectedErr: context.DeadlineExceeded,
 		},
-		{name: "2 - initial context without timeout with future's timeout",
-			f:           New(prom, context.Background(), 100*time.Millisecond, true),
+		{name: "2 - initial context with timeout, future with longer timeout",
+			ctxTimeout:  100 * time.Millisecond,
+			f:           New(promise, context.Background(), 300*time.Millisecond, true),
+			wantErr:     true,
+			expectedErr: context.DeadlineExceeded,
+		},
+		{name: "3 - initial context with longer timeout, future with timeout",
+			ctxTimeout:  300 * time.Millisecond,
+			f:           New(promise, context.Background(), 100*time.Millisecond, true),
 			wantErr:     true,
 			expectedErr: ErrPromiseTimeout,
 		},
-		{name: "3 - initial context without timeout, no future's timeout",
-			f:    New(prom, context.Background(), 0, true),
+		{name: "4 - initial context without timeout, future with timeout",
+			f:           New(promise, context.Background(), 100*time.Millisecond, true),
+			wantErr:     true,
+			expectedErr: ErrPromiseTimeout,
+		},
+		{name: "5 - initial context without timeout, future without timeout",
+			f:    New(promise, context.Background(), 0, true),
 			want: 1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.ctxTimeout > 0 {
+				ctx, cancel := context.WithTimeout(tt.f.ctx, tt.ctxTimeout)
+				defer cancel()
+				tt.f.ctx = ctx
+			}
 			got, err := tt.f.Result()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Future.Result() error = %v, wantErr %v", err, tt.wantErr)
@@ -61,15 +78,11 @@ func TestFuture_Result(t *testing.T) {
 	}
 }
 
-func TestFuture_HasResult(t *testing.T) {
+func TestFuture_Depleted(t *testing.T) {
 	future := New(
 		func(ctx context.Context) (interface{}, error) {
-			select {
-			case <-time.After(1 * time.Second):
-				return 1, nil
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
+			time.Sleep(500 * time.Millisecond)
+			return 1, nil
 		},
 		context.Background(),
 		100*time.Millisecond,
@@ -82,14 +95,19 @@ func TestFuture_HasResult(t *testing.T) {
 	}{
 		{name: "first HasResult() call", f: future, want: false},
 		{name: "second HasResult() call", f: future, want: true},
+		{name: "third HasResult() call", f: future, want: true},
+		{name: "forth HasResult() call", f: future, want: true},
 	}
 	for _, tt := range tests {
-		if strings.HasPrefix(tt.name, "second") {
+		if !strings.HasPrefix(tt.name, "first") {
 			time.Sleep(200 * time.Millisecond)
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.f.HasResult(); got != tt.want {
+			if got := tt.f.Depleted(); got != tt.want {
 				t.Errorf("Future.HasResult() = %v, want %v", got, tt.want)
+			}
+			if tt.f.res != nil {
+				t.Error("tt.f.res != nil")
 			}
 		})
 	}

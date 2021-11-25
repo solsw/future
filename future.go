@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-var ErrPromiseTimeout = errors.New("promise timeout")
+var (
+	ErrPromiseTimeout = errors.New("promise timeout")
+)
 
 // Future returns result sometime in the future.
 type Future struct {
@@ -60,6 +62,9 @@ func (f *Future) getResult() {
 	ctx, cancel := context.WithCancel(f.ctx)
 	defer cancel()
 	select {
+	case <-ctx.Done():
+		// initial context canceled or deadlined
+		f.res, f.err = nil, ctx.Err()
 	case <-time.After(f.timeout):
 		f.res, f.err = nil, ErrPromiseTimeout
 	case <-func() <-chan struct{} {
@@ -67,8 +72,8 @@ func (f *Future) getResult() {
 		go func() {
 			defer close(ch)
 			res, err := f.promise(ctx)
-			// promise may be already timed out here
-			if f.err == ErrPromiseTimeout {
+			// promise may be already canceled or timed out here
+			if f.err != nil {
 				return
 			}
 			f.res, f.err = res, err
@@ -78,10 +83,10 @@ func (f *Future) getResult() {
 	}
 }
 
-// Result returns the Future's result.
+// Result returns the Future's result or/and error.
 //
-// If the result (possibly containing only error) is not ready yet,
-// Result blocks until the result is ready. Result is threadsafe.
+// If a result or/and an error is not obtained yet, Result blocks until the Future depletes.
+// Result is threadsafe.
 func (f *Future) Result() (interface{}, error) {
 	if f.lazy {
 		f.once.Do(func() { f.getResult() })
@@ -90,7 +95,7 @@ func (f *Future) Result() (interface{}, error) {
 	return f.res, f.err
 }
 
-// HasResult reports whether the Future already has a result.
-func (f *Future) HasResult() bool {
+// Depleted reports whether the Future already has a result or/and an error.
+func (f *Future) Depleted() bool {
 	return f.hasResult
 }
