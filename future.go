@@ -11,7 +11,7 @@ var (
 	ErrPromiseTimeout = errors.New("promise timeout")
 )
 
-// Future returns result sometime in the future.
+// Future returns the result sometime in the future.
 type Future struct {
 	ctx     context.Context
 	promise func(ctx context.Context) (interface{}, error)
@@ -26,17 +26,17 @@ type Future struct {
 	err       error
 }
 
-// New creates new Future.
+// New creates a new Future.
 //
-// 'promise' produces the Future's result. 'promise' will be called exactly once.
 // 'ctx' - initial context (is passed to 'promise', if 'timeout' is not provided).
+// 'promise' produces the Future's result. 'promise' will be called exactly once.
 // 'timeout' - timeout for 'promise' (pass zero if timeout is not needed).
 // If 'timeout' is provided, new context (that is canceled when 'timeout' elapses)
 // is derived from 'ctx' and passed to 'promise'.
 // 'promise' must respect context cancelling to not leak goroutine.
 // If 'lazy', 'promise' will be called synchronously by the first Result() call,
 // otherwise - asynchronously immediately.
-func New(promise func(context.Context) (interface{}, error), ctx context.Context, timeout time.Duration, lazy bool) *Future {
+func New(ctx context.Context, promise func(context.Context) (interface{}, error), timeout time.Duration, lazy bool) *Future {
 	f := Future{
 		ctx:     ctx,
 		promise: promise,
@@ -85,7 +85,7 @@ func (f *Future) getResult() {
 
 // Result returns the Future's result or/and error.
 //
-// If a result or/and an error is not obtained yet, Result blocks until the Future depletes.
+// If a result or/and an error is not obtained yet, Result blocks until the Future runs to depletion.
 // Result is threadsafe.
 func (f *Future) Result() (interface{}, error) {
 	if f.lazy {
