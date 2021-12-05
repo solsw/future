@@ -1,3 +1,5 @@
+//go:build go1.18
+
 package future
 
 import (
@@ -12,9 +14,9 @@ var (
 )
 
 // Future returns the result sometime in the future.
-type Future struct {
+type Future[Result any] struct {
 	ctx     context.Context
-	promise func(ctx context.Context) (interface{}, error)
+	promise func(ctx context.Context) (Result, error)
 	timeout time.Duration
 	lazy    bool
 
@@ -22,7 +24,7 @@ type Future struct {
 	wg   sync.WaitGroup
 
 	hasResult bool
-	res       interface{}
+	res       Result
 	err       error
 }
 
@@ -35,8 +37,8 @@ type Future struct {
 // is derived from 'ctx' and passed to 'promise'. 'promise' must respect context cancelling to not leak goroutine.
 // If 'promise' does not complete before 'timeout' elapses, 'promise' is discarded and ErrPromiseTimeout is returned.
 // If 'lazy', 'promise' will be called synchronously by the first Result() call, otherwise - asynchronously immediately.
-func New(ctx context.Context, promise func(context.Context) (interface{}, error), timeout time.Duration, lazy bool) *Future {
-	f := Future{
+func New[Result any](ctx context.Context, promise func(context.Context) (Result, error), timeout time.Duration, lazy bool) *Future[Result] {
+	f := Future[Result]{
 		ctx:     ctx,
 		promise: promise,
 		timeout: timeout,
@@ -49,7 +51,7 @@ func New(ctx context.Context, promise func(context.Context) (interface{}, error)
 	return &f
 }
 
-func (f *Future) getResult() {
+func (f *Future[Result]) getResult() {
 	defer func() {
 		f.hasResult = true
 		f.wg.Done()
@@ -63,9 +65,11 @@ func (f *Future) getResult() {
 	select {
 	case <-ctx.Done():
 		// initial context canceled or deadlined
-		f.res, f.err = nil, ctx.Err()
+		var r0 Result
+		f.res, f.err = r0, ctx.Err()
 	case <-time.After(f.timeout):
-		f.res, f.err = nil, ErrPromiseTimeout
+		var r0 Result
+		f.res, f.err = r0, ErrPromiseTimeout
 	case <-func() <-chan struct{} {
 		ch := make(chan struct{})
 		go func() {
@@ -86,7 +90,7 @@ func (f *Future) getResult() {
 //
 // If a result or/and an error is not obtained yet, Result blocks until the Future runs to depletion.
 // Result is threadsafe.
-func (f *Future) Result() (interface{}, error) {
+func (f *Future[Result]) Result() (Result, error) {
 	if f.lazy {
 		f.once.Do(func() { f.getResult() })
 	}
@@ -95,6 +99,6 @@ func (f *Future) Result() (interface{}, error) {
 }
 
 // Depleted reports whether the Future already has a result or/and an error.
-func (f *Future) Depleted() bool {
+func (f *Future[Result]) Depleted() bool {
 	return f.hasResult
 }
