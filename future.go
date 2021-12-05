@@ -28,14 +28,13 @@ type Future struct {
 
 // New creates a new Future.
 //
-// 'ctx' - initial context (is passed to 'promise', if 'timeout' is not provided).
-// 'promise' produces the Future's result. 'promise' will be called exactly once.
-// 'timeout' - timeout for 'promise' (pass zero if timeout is not needed).
+// 'ctx' - initial context (is passed to 'promise' as is if 'timeout' is not provided).
+// 'promise' produces the Future's result. 'promise' is called exactly once.
+// 'timeout' - timeout to wait for 'promise' to complete (pass zero if timeout is not needed).
 // If 'timeout' is provided, new context (that is canceled when 'timeout' elapses)
-// is derived from 'ctx' and passed to 'promise'.
-// 'promise' must respect context cancelling to not leak goroutine.
-// If 'lazy', 'promise' will be called synchronously by the first Result() call,
-// otherwise - asynchronously immediately.
+// is derived from 'ctx' and passed to 'promise'. 'promise' must respect context cancelling to not leak goroutine.
+// If 'promise' does not complete before 'timeout' elapses, 'promise' is discarded and ErrPromiseTimeout is returned.
+// If 'lazy', 'promise' will be called synchronously by the first Result() call, otherwise - asynchronously immediately.
 func New(ctx context.Context, promise func(context.Context) (interface{}, error), timeout time.Duration, lazy bool) *Future {
 	f := Future{
 		ctx:     ctx,
