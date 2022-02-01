@@ -4,5 +4,5 @@
 
 Package **future** contains an implementation of [explicit](https://en.wikipedia.org/wiki/Futures_and_promises#Implicit_vs._explicit) [future](https://en.wikipedia.org/wiki/Futures_and_promises).
 
-Since **future@v2** uses generics it requires at least Go 1.18.
-Use [gotip tool](https://pkg.go.dev/golang.org/dl/gotip) or install https://go.dev/dl/#go1.18beta1 to experiment with **future@v2**.
+Since **future** uses generics it requires at least Go 1.18.
+Use [gotip tool](https://pkg.go.dev/golang.org/dl/gotip) or install [go1.18beta2](https://go.dev/dl/#go1.18beta2) to experiment with  **future**.
