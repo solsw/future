@@ -86,7 +86,7 @@ func (f *Future[Result]) getResult() {
 	}
 }
 
-// Result returns the Future's result or/and an error.
+// Result returns the Future's result or/and error.
 //
 // If a result or/and an error is not obtained yet, Result blocks until the Future runs to depletion.
 // Result is threadsafe.
