@@ -1,5 +1,3 @@
-//go:build go1.18
-
 package future
 
 import (
@@ -29,29 +27,29 @@ func TestFuture_Result(t *testing.T) {
 	}{
 		{name: "1 - initial context with timeout, future without timeout",
 			ctxTimeout:  100 * time.Millisecond,
-			f:           New[int](context.Background(), promise, 0, true),
+			f:           New(context.Background(), promise, 0, true),
 			wantErr:     true,
 			expectedErr: context.DeadlineExceeded,
 		},
 		{name: "2 - initial context with timeout, future with longer timeout",
 			ctxTimeout:  100 * time.Millisecond,
-			f:           New[int](context.Background(), promise, 300*time.Millisecond, true),
+			f:           New(context.Background(), promise, 300*time.Millisecond, true),
 			wantErr:     true,
 			expectedErr: context.DeadlineExceeded,
 		},
 		{name: "3 - initial context with longer timeout, future with timeout",
 			ctxTimeout:  300 * time.Millisecond,
-			f:           New[int](context.Background(), promise, 100*time.Millisecond, true),
+			f:           New(context.Background(), promise, 100*time.Millisecond, true),
 			wantErr:     true,
 			expectedErr: ErrPromiseTimeout,
 		},
 		{name: "4 - initial context without timeout, future with timeout",
-			f:           New[int](context.Background(), promise, 100*time.Millisecond, true),
+			f:           New(context.Background(), promise, 100*time.Millisecond, true),
 			wantErr:     true,
 			expectedErr: ErrPromiseTimeout,
 		},
 		{name: "5 - initial context without timeout, future without timeout",
-			f:    New[int](context.Background(), promise, 0, true),
+			f:    New(context.Background(), promise, 0, true),
 			want: 1,
 		},
 	}
@@ -85,7 +83,7 @@ func TestFuture_Depleted_1(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		return "", nil
 	}
-	future := New[string](context.Background(), promise, 0, false)
+	future := New(context.Background(), promise, 0, false)
 	tests := []struct {
 		name string
 		f    *Future[string]
@@ -113,7 +111,7 @@ func TestFuture_Depleted_2(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 		return "", nil
 	}
-	future := New[string](context.Background(), promise, 300*time.Millisecond, false)
+	future := New(context.Background(), promise, 300*time.Millisecond, false)
 	tests := []struct {
 		name string
 		f    *Future[string]
