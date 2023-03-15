@@ -26,19 +26,15 @@ type Future[Result any] struct {
 	err      error
 }
 
-// New creates a new Future.
-//
-// 'ctx' - initial context (is passed to 'promise' as is if 'timeout' is not provided).
-//
-// 'promise' produces the Future's result. 'promise' is called exactly once.
-// 'promise' must respect 'ctx' cancelling to not leak the goroutine.
-// If 'promise' does not complete before 'timeout' elapses, 'promise' is discarded and ErrPromiseTimeout is returned.
-//
-// 'timeout' - timeout to wait for 'promise' to complete (pass zero if timeout is not needed).
-// If 'timeout' is provided, new context (that is canceled when 'timeout' elapses)
-// is derived from 'ctx' and passed to 'promise'.
-//
-// If 'lazy', 'promise' will be called synchronously by the first Result() call, otherwise - asynchronously immediately.
+// New creates a new Future:
+//   - 'ctx' - initial context (is passed to 'promise' as is if 'timeout' is not provided);
+//   - 'promise' produces the Future's result. 'promise' is called exactly once;
+//     'promise' must respect 'ctx' cancelling to not leak the goroutine;
+//     if 'promise' does not complete before 'timeout' elapses, 'promise' is discarded and ErrPromiseTimeout is returned;
+//   - 'timeout' - timeout to wait for 'promise' to complete (pass zero if timeout is not needed);
+//     if 'timeout' is provided, new context (that is canceled when 'timeout' elapses)
+//     is derived from 'ctx' and passed to 'promise';
+//   - if 'lazy', 'promise' will be called synchronously by the first Result() call, otherwise - asynchronously immediately.
 func New[Result any](ctx context.Context, promise func(context.Context) (Result, error), timeout time.Duration, lazy bool) *Future[Result] {
 	f := Future[Result]{
 		ctx:     ctx,
