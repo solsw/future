@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -21,7 +22,7 @@ type Future[Result any] struct {
 	once sync.Once
 	wg   sync.WaitGroup
 
-	depleted bool
+	depleted atomic.Bool
 	res      Result
 	err      error
 }
@@ -51,7 +52,7 @@ func New[Result any](ctx context.Context, promise func(context.Context) (Result,
 
 func (f *Future[Result]) getResult() {
 	defer func() {
-		f.depleted = true
+		f.depleted.Store(true)
 		f.wg.Done()
 	}()
 	if f.timeout <= 0 {
@@ -60,27 +61,25 @@ func (f *Future[Result]) getResult() {
 	}
 	ctx, cancel := context.WithCancel(f.ctx)
 	defer cancel()
+	type result struct {
+		v   Result
+		err error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		v, err := f.promise(ctx)
+		ch <- result{v, err}
+	}()
 	select {
-	case <-ctx.Done():
+	case <-f.ctx.Done():
 		// initial context canceled or deadlined
 		var r0 Result
-		f.res, f.err = r0, ctx.Err()
+		f.res, f.err = r0, f.ctx.Err()
 	case <-time.After(f.timeout):
 		var r0 Result
 		f.res, f.err = r0, ErrPromiseTimeout
-	case <-func() <-chan struct{} {
-		ch := make(chan struct{})
-		go func() {
-			defer close(ch)
-			res, err := f.promise(ctx)
-			// promise may be already canceled or deadlined here
-			if f.err != nil {
-				return
-			}
-			f.res, f.err = res, err
-		}()
-		return ch
-	}():
+	case r := <-ch:
+		f.res, f.err = r.v, r.err
 	}
 }
 
@@ -90,7 +89,7 @@ func (f *Future[Result]) getResult() {
 // Result is threadsafe.
 func (f *Future[Result]) Result() (Result, error) {
 	if f.lazy {
-		f.once.Do(func() { f.getResult() })
+		f.once.Do(f.getResult)
 	}
 	f.wg.Wait()
 	return f.res, f.err
@@ -98,5 +97,5 @@ func (f *Future[Result]) Result() (Result, error) {
 
 // Depleted reports whether the Future already has a result or/and an error.
 func (f *Future[Result]) Depleted() bool {
-	return f.depleted
+	return f.depleted.Load()
 }

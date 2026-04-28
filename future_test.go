@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -78,6 +79,84 @@ func TestFuture_Result(t *testing.T) {
 	}
 }
 
+func TestFuture_Result_Eager(t *testing.T) {
+	promise := func(ctx context.Context) (int, error) {
+		select {
+		case <-time.After(500 * time.Millisecond):
+			return 1, nil
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		}
+	}
+	t.Run("1 - initial context with timeout, future without timeout", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_, err := New(ctx, promise, 0, false).Result()
+		if err != context.DeadlineExceeded {
+			t.Errorf("got %v, want DeadlineExceeded", err)
+		}
+	})
+	t.Run("2 - initial context with timeout, future with longer timeout", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_, err := New(ctx, promise, 300*time.Millisecond, false).Result()
+		if err != context.DeadlineExceeded {
+			t.Errorf("got %v, want DeadlineExceeded", err)
+		}
+	})
+	t.Run("3 - initial context with longer timeout, future with timeout", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+		defer cancel()
+		_, err := New(ctx, promise, 100*time.Millisecond, false).Result()
+		if err != ErrPromiseTimeout {
+			t.Errorf("got %v, want ErrPromiseTimeout", err)
+		}
+	})
+	t.Run("4 - initial context without timeout, future with timeout", func(t *testing.T) {
+		_, err := New(context.Background(), promise, 100*time.Millisecond, false).Result()
+		if err != ErrPromiseTimeout {
+			t.Errorf("got %v, want ErrPromiseTimeout", err)
+		}
+	})
+	t.Run("5 - initial context without timeout, future without timeout", func(t *testing.T) {
+		got, err := New(context.Background(), promise, 0, false).Result()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if got != 1 {
+			t.Errorf("got %d, want 1", got)
+		}
+	})
+}
+
+func TestFuture_Result_Concurrent(t *testing.T) {
+	promise := func(_ context.Context) (int, error) {
+		time.Sleep(100 * time.Millisecond)
+		return 42, nil
+	}
+	f := New(context.Background(), promise, 0, false)
+	const n = 10
+	got := make([]int, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := range n {
+		go func() {
+			defer wg.Done()
+			got[i], errs[i] = f.Result()
+		}()
+	}
+	wg.Wait()
+	for i := range n {
+		if errs[i] != nil {
+			t.Errorf("goroutine %d: unexpected error: %v", i, errs[i])
+		}
+		if got[i] != 42 {
+			t.Errorf("goroutine %d: got %d, want 42", i, got[i])
+		}
+	}
+}
+
 func TestFuture_Depleted_1(t *testing.T) {
 	promise := func(_ context.Context) (string, error) {
 		time.Sleep(100 * time.Millisecond)
@@ -96,7 +175,7 @@ func TestFuture_Depleted_1(t *testing.T) {
 	}
 	for _, tt := range tests {
 		if !strings.HasPrefix(tt.name, "first") {
-			time.Sleep(200 * time.Millisecond)
+			tt.f.Result()
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.f.Depleted(); got != tt.want {
@@ -125,8 +204,11 @@ func TestFuture_Depleted_2(t *testing.T) {
 		{name: "fourth HasResult() call", f: future, want: true},
 	}
 	for _, tt := range tests {
-		if !strings.HasPrefix(tt.name, "first") {
+		switch {
+		case strings.HasPrefix(tt.name, "second"):
 			time.Sleep(200 * time.Millisecond)
+		case strings.HasPrefix(tt.name, "third"):
+			future.Result()
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.f.Depleted(); got != tt.want {
