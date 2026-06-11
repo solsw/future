@@ -169,17 +169,17 @@ func TestFuture_Depleted_1(t *testing.T) {
 		want bool
 	}{
 		// promise has not returned yet
-		{name: "first HasResult() call", f: future, want: false},
+		{name: "first Depleted() call", f: future, want: false},
 		// promise has already returned
-		{name: "second HasResult() call", f: future, want: true},
+		{name: "second Depleted() call", f: future, want: true},
 	}
 	for _, tt := range tests {
 		if !strings.HasPrefix(tt.name, "first") {
-			tt.f.Result()
+			_, _ = tt.f.Result()
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.f.Depleted(); got != tt.want {
-				t.Errorf("Future.HasResult() = %v, want %v", got, tt.want)
+				t.Errorf("Future.Depleted() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -197,22 +197,22 @@ func TestFuture_Depleted_2(t *testing.T) {
 		want bool
 	}{
 		// future's timeout (300 ms) has not elapsed yet
-		{name: "first HasResult() call", f: future, want: false},
-		{name: "second HasResult() call", f: future, want: false},
+		{name: "first Depleted() call", f: future, want: false},
+		{name: "second Depleted() call", f: future, want: false},
 		// future's timeout (300 ms) has already elapsed
-		{name: "third HasResult() call", f: future, want: true},
-		{name: "fourth HasResult() call", f: future, want: true},
+		{name: "third Depleted() call", f: future, want: true},
+		{name: "fourth Depleted() call", f: future, want: true},
 	}
 	for _, tt := range tests {
 		switch {
 		case strings.HasPrefix(tt.name, "second"):
 			time.Sleep(200 * time.Millisecond)
 		case strings.HasPrefix(tt.name, "third"):
-			future.Result()
+			_, _ = tt.f.Result()
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.f.Depleted(); got != tt.want {
-				t.Errorf("Future.HasResult() = %v, want %v", got, tt.want)
+				t.Errorf("Future.Depleted() = %v, want %v", got, tt.want)
 			}
 		})
 	}
