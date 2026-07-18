@@ -22,8 +22,6 @@ go get github.com/solsw/future/v2
 import "github.com/solsw/future/v2"
 ```
 
-Requires Go 1.26 or later (the package uses generics).
-
 ## API
 
 ### New
@@ -173,9 +171,3 @@ Notes:
   When the Future gives up (timeout or canceled context), the context passed
   to the promise is canceled, but the promise's goroutine keeps running
   until the promise itself returns.
-
-## Links
-
-- [GitLab](https://github.com/solsw/future) (primary)
-- [GitHub](https://github.com/solsw/future) (mirror)
-- [Go Reference](https://pkg.go.dev/github.com/solsw/future/v2)
